@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stddef.h>
+
 namespace mtl {
 
 template<typename T> concept bool Reloc   = requires(T d) {

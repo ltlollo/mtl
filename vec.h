@@ -2,7 +2,6 @@
 
 #include "com.h"
 
-#include <cstddef>
 #include <stdlib.h>
 #include <string.h>
 

@@ -19,7 +19,6 @@ template<typename T> struct Aq {
     Ele<T> trampoline;
 };
 
-
 template<typename T> void del(T* d) {
     del(d);
 }
@@ -29,13 +28,11 @@ template<typename T> void init(T*& d) {
 template<typename T> void init(std::atomic<T*>& d) {
     d = nullptr;
 }
-
 void init(Aq<auto>& q) {
     init(q.trampoline.next);
 }
 
-template<typename T>
-void chain(Aq<T>& q, Ele<T>* ele) {
+template<typename T> void chain(Aq<T>& q, Ele<T>* ele) {
     Ele<T>* curr = &q.trampoline;
     Ele<T>* prev = curr;
     do {
@@ -169,7 +166,6 @@ template<NoDel T> T get(Aq<T>& q, auto filt) {
     }, false);
     return res;
 }
-
 std::size_t rm(Aq<auto>& q, auto filt) {
     std::size_t n = 0;
     apply(q, filt, [&](auto* ele) {
