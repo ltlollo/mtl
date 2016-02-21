@@ -155,7 +155,7 @@ template<typename T> void push(Aq<T>& q, Ele<T>* ele) {
     push(q, ele, ele);
 }
 
-template<typename> T get(Aq<T>& q, auto filt) {
+template<typename T> T get(Aq<T>& q, auto filt) {
     T res;
     init(res);
     apply(q, filt, [&](auto* ele) {
