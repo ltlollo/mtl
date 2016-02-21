@@ -166,8 +166,8 @@ template<NoDel T> T get(Aq<T>& q, auto filt) {
     }, false);
     return res;
 }
-std::size_t rm(Aq<auto>& q, auto filt) {
-    std::size_t n = 0;
+size_t rm(Aq<auto>& q, auto filt) {
+    size_t n = 0;
     apply(q, filt, [&](auto* ele) {
           del(ele->data);
           del(ele);
@@ -175,8 +175,8 @@ std::size_t rm(Aq<auto>& q, auto filt) {
     });
     return n;
 }
-std::size_t rm(Aq<Del>& q, auto filt) {
-    std::size_t n = 0;
+size_t rm(Aq<Del>& q, auto filt) {
+    size_t n = 0;
     apply(q, filt, [&](auto* ele) {
           del(ele->data);
           del(ele);
@@ -184,15 +184,14 @@ std::size_t rm(Aq<Del>& q, auto filt) {
     });
     return n;
 }
-std::size_t rm(Aq<NoDel>& q, auto filt) {
-    std::size_t n = 0;
+size_t rm(Aq<NoDel>& q, auto filt) {
+    size_t n = 0;
     apply(q, filt, [&](auto* ele) {
           del(ele);
           ++n;
     });
     return n;
 }
-
 template<Del T> T last(Aq<Del>& q) {
     T res;
     init(res);
@@ -214,7 +213,6 @@ template<NoDel T> T last(Aq<NoDel>& q) {
     }, false);
     return res;
 }
-
 bool rmlast(Aq<Del>& q) {
     auto last = last(q);
     if (last) {
@@ -223,11 +221,9 @@ bool rmlast(Aq<Del>& q) {
     }
     return false;
 }
-
 bool rmlast(Aq<NoDel>& q) {
     return last(q);
 }
-
 template<typename T> Ele<T>* gather(Aq<T>& q, auto filt) {
     Ele<T> *head = nullptr;
     apply(q, filt, [&](auto* ele) {
