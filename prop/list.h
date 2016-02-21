@@ -15,27 +15,27 @@ namespace mtl {
 template<typename T> struct alignas(cacheln) Ele {
     std::atomic<Ele<T>*> next;
     T data;
-    Ele() {
+    Ele() noexcept {
         next = nullptr;
     }
-    Ele(T&& value) : data{std::move(value)} {
+    Ele(T&& value) noexcept : data{std::move(value)} {
         static_assert(std::is_nothrow_move_constructible<T>());
         static_assert(std::is_default_constructible<T>());
     }
-    Ele(const T& value) : data{value} {
+    Ele(const T& value) noexcept : data{value} {
         static_assert(std::is_nothrow_copy_constructible<T>());
     }
 };
 template<typename T> struct alignas(cacheln) Ele<T*> {
     std::atomic<Ele<T>*> next;
     T *data;
-    Ele() {
+    Ele() noexcept {
         data = nullptr;
         next = nullptr;
     }
-    Ele(T* value) : data{value} {
+    Ele(T* value) noexcept : data{value} {
     }
-    ~Ele() {
+    ~Ele() noexcept {
         delete data;
     }
 };
@@ -44,7 +44,7 @@ template<typename T> struct MtList {
     Ele<T> trampoline = {};
 };
 
-template<typename T> void chain(MtList<T>& q, Ele<T>* ele) {
+template<typename T> void chain(MtList<T>& q, Ele<T>* ele) noexcept {
     Ele<T> *curr = &q.trampoline;
     Ele<T> *prev = curr;
     do {
@@ -59,72 +59,64 @@ template<typename T> void chain(MtList<T>& q, Ele<T>* ele) {
         prev = curr;
     } while (true);
 }
-
 template<typename T>
-void apply(MtList<T>& q, auto filt, auto pred, bool cont = true) {
+void apply(MtList<T>& q, auto filt, auto pred, bool cont = true) noexcept {
     Ele<T> *curr = &q.trampoline;
     Ele<T> *prev = curr;
     Ele<T> *next;
-    do {
-        while ((curr = curr->next.exchange(curr, consume)) == prev) {
-            continue;
-        }
-        if (curr == nullptr) {
-            prev->next.store(nullptr, relaxed);
-            break;
-        }
+    while ((curr = curr->next.exchange(curr, consume)) == prev) {
+        continue;
+    }
+    while (curr) {
         next = curr;
         while ((next = next->next.exchange(next, consume)) == curr) {
             continue;
         }
         if (filt(curr->data)) {
             pred(curr);
-            prev->next.store(next, relaxed);
             if (!cont) {
-                break;
+                prev->next.store(next, relaxed);
+                return;
             }
-            curr = prev;
+            curr = next;
         } else {
             prev->next.store(curr, relaxed);
-            curr->next.store(next, relaxed);
             prev = curr;
+            curr = next;
         }
-    } while (true);
+    }
+    prev->next.store(nullptr, relaxed);
 }
-
 template<typename T>
-void applyzip(MtList<T>& q, auto filt, auto pred, bool cont = true) {
-    Ele<T>* curr = &q.trampoline;
-    Ele<T>* prev = curr;
-    Ele<T>* next;
-    do {
-        while ((curr = curr->next.exchange(curr, consume)) == prev) {
-            continue;
-        }
-        if (curr == nullptr) {
-            prev->next.store(nullptr, relaxed);
-            break;
-        }
+void applyzip(MtList<T>& q, auto filt, auto pred, bool cont = true) noexcept {
+    Ele<T> *curr = &q.trampoline;
+    Ele<T> *prev = curr;
+    Ele<T> *next;
+    while ((curr = curr->next.exchange(curr, consume)) == prev) {
+        continue;
+    }
+    while (curr) {
         next = curr;
         while ((next = next->next.exchange(next, consume)) == curr) {
             continue;
         }
         if (filt(curr->data, next)) {
             pred(curr);
-            prev->next.store(next, relaxed);
             if (!cont) {
-                break;
+                prev->next.store(next, relaxed);
+                return;
             }
-            curr = prev;
+            curr = next;
         } else {
             prev->next.store(curr, relaxed);
-            curr->next.store(next, relaxed);
             prev = curr;
+            curr = next;
         }
-    } while (true);
+    }
+    prev->next.store(nullptr, relaxed);
 }
-
-template<typename T> bool insert(MtList<T>& q, auto* head, auto* tail, auto pred) {
+template<typename T>
+bool insert(MtList<T>& q, auto* head, auto* tail, auto pred) noexcept {
     Ele<T> *curr = &q.trampoline;
     Ele<T> *prev = curr;
     do {
@@ -144,11 +136,13 @@ template<typename T> bool insert(MtList<T>& q, auto* head, auto* tail, auto pred
     } while (true);
 }
 
-template<typename T> bool insert(MtList<T>& q, Ele<T>* ele, auto pred) {
+template<typename T>
+bool insert(MtList<T>& q, Ele<T>* ele, auto pred) noexcept {
     return insert(q, ele, ele, pred);
 }
 
-template<typename T> void push(MtList<T>& q, Ele<T>* head, Ele<T>* tail) {
+template<typename T>
+void push(MtList<T>& q, Ele<T>* head, Ele<T>* tail) noexcept {
     Ele<T> *curr = &q.trampoline;
     Ele<T> *prev = curr;
     while ((curr = curr->next.exchange(curr, consume)) == prev) {
@@ -158,10 +152,10 @@ template<typename T> void push(MtList<T>& q, Ele<T>* head, Ele<T>* tail) {
     prev->next.store(head, release);
 }
 
-template<typename T> void push(MtList<T>& q, Ele<T>* ele) {
+template<typename T> void push(MtList<T>& q, Ele<T>* ele) noexcept {
     push(q, ele, ele);
 }
-template<typename T> auto get(MtList<T*>& q, auto filt) {
+template<typename T> auto get(MtList<T*>& q, auto filt) noexcept {
     T *res = nullptr;
     apply(q, filt, [&](auto* ele) {
           std::swap(res, ele->data);
@@ -169,7 +163,7 @@ template<typename T> auto get(MtList<T*>& q, auto filt) {
     }, false);
     return res;
 }
-template<typename T> auto get(MtList<T>& q, auto filt) {
+template<typename T> auto get(MtList<T>& q, auto filt) noexcept {
     T res = {};
     apply(q, filt, [&](auto* ele) {
           res = std::move(ele->data);
@@ -177,7 +171,7 @@ template<typename T> auto get(MtList<T>& q, auto filt) {
     }, false);
     return res;
 }
-size_t rm(MtList<auto>& q, auto filt) {
+size_t rm(MtList<auto>& q, auto filt) noexcept {
     size_t n = 0;
     apply(q, filt, [&](auto* ele) {
           delete ele;
@@ -185,7 +179,7 @@ size_t rm(MtList<auto>& q, auto filt) {
     });
     return n;
 }
-template<typename T> auto last(MtList<T>& q) {
+template<typename T> auto last(MtList<T>& q) noexcept {
     T res = {};
     applyzip(q, [](T, Ele<T>* nx) {
           return nx == nullptr;
@@ -195,7 +189,7 @@ template<typename T> auto last(MtList<T>& q) {
     }, false);
     return res;
 }
-template<typename T> auto last(MtList<T*>& q) {
+template<typename T> auto last(MtList<T*>& q) noexcept {
     T *res = nullptr;
     applyzip(q, [](T, Ele<T>* nx) {
           return nx == nullptr;
@@ -205,17 +199,20 @@ template<typename T> auto last(MtList<T*>& q) {
     }, false);
     return res;
 }
-bool rmlast(MtList<auto>& q) {
-    bool found = false;
+template<typename T> bool rmlast(MtList<T>& q) noexcept {
+    Ele<T> *res = nullptr;
     applyzip(q, [](auto, auto* nx) {
         return nx == nullptr;
     }, [&](auto* ele) {
-        delete ele;
-        found = true;
+        res = ele;
     }, false);
-    return found;
+    if (res) {
+        delete res;
+        return true;
+    }
+    return false;
 }
-template<typename T> Ele<T>* gather(MtList<T>& q, auto filt) {
+template<typename T> Ele<T>* gather(MtList<T>& q, auto filt) noexcept {
     Ele<T> *head = nullptr;
     apply(q, filt, [&](auto* ele) {
         ele->next = head;
@@ -225,7 +222,7 @@ template<typename T> Ele<T>* gather(MtList<T>& q, auto filt) {
 }
 
 template<typename T>
-void atomic_swap(MtList<T>& f, MtList<T>& s) {
+void atomic_swap(MtList<T>& f, MtList<T>& s) noexcept {
     Ele<T> *fcurr = &f.trampoline;
     Ele<T> *fprev = fcurr;
     Ele<T> *scurr = &s.trampoline;
