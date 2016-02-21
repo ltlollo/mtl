@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vec.h"
+#include "com.h"
 #include <atomic>
 
 static constexpr auto cacheln = 64;
