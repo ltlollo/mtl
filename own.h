@@ -16,7 +16,7 @@ void del(Own<NoDel>& d) {
 }
 void del(Own<Del>& d) {
     del(d->data);
-    free(&d.data);
+    free(d.data);
 }
 template<Init T> bool make(Own<T>& d) {
     if ((d.data = mem::ualloc<T>(1)) == nullptr) {
