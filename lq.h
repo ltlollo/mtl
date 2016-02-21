@@ -2,6 +2,7 @@
 
 #include "com.h"
 #include <atomic>
+#include <stdlib.h>
 
 static constexpr auto cacheln = 64;
 static constexpr auto consume = std::memory_order_consume;
@@ -28,8 +29,12 @@ template<typename T> void init(std::atomic<T*>& d) {
 void init(Aq<auto>& q) {
     init(q.trampoline.next);
 }
-template<typename T> void del(T*& d) {
-    free(d);
+void del(Ele<NoDel>& ele) {
+    free(&ele);
+}
+void del(Ele<Del>& ele) {
+    del(ele.data);
+    free(&ele);
 }
 
 template<typename T> void chain(Aq<T>& q, Ele<T>* ele) {
@@ -153,42 +158,24 @@ template<typename T> void push(Aq<T>& q, Ele<T>* ele) {
 template<Del T> T get(Aq<T>& q, auto filt) {
     T res;
     init(res);
-    apply(q, filt, [&](auto ele) {
+    apply(q, filt, [&](auto* ele) {
           res = ele->data;
-          del(ele);
+          free(ele);
     }, false);
     return res;
 }
 template<NoDel T> T get(Aq<T>& q, auto filt) {
     T res;
     init(res);
-    apply(q, filt, [&](auto ele) {
+    apply(q, filt, [&](auto* ele) {
           res = ele->data;
     }, false);
     return res;
 }
 size_t rm(Aq<auto>& q, auto filt) {
     size_t n = 0;
-    apply(q, filt, [&](auto ele) {
-          del(ele->data);
-          del(ele);
-          ++n;
-    });
-    return n;
-}
-size_t rm(Aq<Del>& q, auto filt) {
-    size_t n = 0;
-    apply(q, filt, [&](auto ele) {
-          del(ele->data);
-          del(ele);
-          ++n;
-    });
-    return n;
-}
-size_t rm(Aq<NoDel>& q, auto filt) {
-    size_t n = 0;
-    apply(q, filt, [&](auto ele) {
-          del(ele);
+    apply(q, filt, [&](auto* ele) {
+          del(*ele);
           ++n;
     });
     return n;
@@ -200,7 +187,7 @@ template<Del T> auto last(Aq<T>& q) {
           return nx == nullptr;
     }, [&](auto ele) {
           res = ele->data;
-          del(ele);
+          free(ele);
     }, false);
     return res;
 }
@@ -214,17 +201,15 @@ template<NoDel T> auto last(Aq<T>& q) {
     }, false);
     return res;
 }
-
-template<Del T> bool rmlast(Aq<T>& q) {
-    T ele = last(q);
-    if (ele) {
-        del(ele);
-        return true;
-    }
-    return false;
-}
-bool rmlast(Aq<NoDel>& q) {
-    return last(q);
+bool rmlast(Aq<auto>& q) {
+    bool found = false;
+    applyzip(q, [](auto, auto* nx) {
+          return nx == nullptr;
+    }, [&](auto* ele) {
+          del(*ele);
+          found = true;
+    }, false);
+    return found;
 }
 template<typename T> Ele<T>* gather(Aq<T>& q, auto filt) {
     Ele<T> *head = nullptr;

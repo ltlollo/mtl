@@ -10,9 +10,6 @@ template<typename T> concept bool Reloc   = requires(T d) {
 template<typename T> concept bool Del     = requires(T d) {
     { del(d)        } -> void
 };
-template<typename T> concept bool Del     = requires(T* d) {
-    { del(d)        } -> void
-};
 template<typename T> concept bool Init    = requires(T d) {
     { init(d)       } -> void
 };
