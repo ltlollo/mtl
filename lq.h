@@ -19,9 +19,6 @@ template<typename T> struct Aq {
     Ele<T> trampoline;
 };
 
-template<typename T> void del(T* d) {
-    del(d);
-}
 template<typename T> void init(T*& d) {
     d = nullptr;
 }
@@ -30,6 +27,9 @@ template<typename T> void init(std::atomic<T*>& d) {
 }
 void init(Aq<auto>& q) {
     init(q.trampoline.next);
+}
+template<typename T> void del(T*& d) {
+    free(d);
 }
 
 template<typename T> void chain(Aq<T>& q, Ele<T>* ele) {
@@ -151,8 +151,9 @@ template<typename T> void push(Aq<T>& q, Ele<T>* ele) {
 }
 
 template<Del T> T get(Aq<T>& q, auto filt) {
-    T* res = nullptr;
-    apply(q, filt, [&](auto* ele) {
+    T res;
+    init(res);
+    apply(q, filt, [&](auto ele) {
           res = ele->data;
           del(ele);
     }, false);
@@ -161,14 +162,14 @@ template<Del T> T get(Aq<T>& q, auto filt) {
 template<NoDel T> T get(Aq<T>& q, auto filt) {
     T res;
     init(res);
-    apply(q, filt, [&](auto* ele) {
+    apply(q, filt, [&](auto ele) {
           res = ele->data;
     }, false);
     return res;
 }
 size_t rm(Aq<auto>& q, auto filt) {
     size_t n = 0;
-    apply(q, filt, [&](auto* ele) {
+    apply(q, filt, [&](auto ele) {
           del(ele->data);
           del(ele);
           ++n;
@@ -177,7 +178,7 @@ size_t rm(Aq<auto>& q, auto filt) {
 }
 size_t rm(Aq<Del>& q, auto filt) {
     size_t n = 0;
-    apply(q, filt, [&](auto* ele) {
+    apply(q, filt, [&](auto ele) {
           del(ele->data);
           del(ele);
           ++n;
@@ -186,37 +187,38 @@ size_t rm(Aq<Del>& q, auto filt) {
 }
 size_t rm(Aq<NoDel>& q, auto filt) {
     size_t n = 0;
-    apply(q, filt, [&](auto* ele) {
+    apply(q, filt, [&](auto ele) {
           del(ele);
           ++n;
     });
     return n;
 }
-template<Del T> T last(Aq<Del>& q) {
+template<Del T> auto last(Aq<T>& q) {
     T res;
     init(res);
-    applyzip(q, [](T*, Ele<T>* nx) {
+    applyzip(q, [](T, Ele<T>* nx) {
           return nx == nullptr;
-    }, [&](auto* ele) {
+    }, [&](auto ele) {
           res = ele->data;
           del(ele);
     }, false);
     return res;
 }
-template<NoDel T> T last(Aq<NoDel>& q) {
+template<NoDel T> auto last(Aq<T>& q) {
     T res;
     init(res);
-    applyzip(q, [](T*, Ele<T>* nx) {
+    applyzip(q, [](T, Ele<T>* nx) {
           return nx == nullptr;
-    }, [&](auto* ele) {
+    }, [&](auto ele) {
           res = ele->data;
     }, false);
     return res;
 }
-bool rmlast(Aq<Del>& q) {
-    auto last = last(q);
-    if (last) {
-        del(last);
+
+template<Del T> bool rmlast(Aq<T>& q) {
+    T ele = last(q);
+    if (ele) {
+        del(ele);
         return true;
     }
     return false;
