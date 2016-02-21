@@ -155,20 +155,12 @@ template<typename T> void push(Aq<T>& q, Ele<T>* ele) {
     push(q, ele, ele);
 }
 
-template<Del T> T get(Aq<T>& q, auto filt) {
+template<typename> T get(Aq<T>& q, auto filt) {
     T res;
     init(res);
     apply(q, filt, [&](auto* ele) {
           res = ele->data;
           free(ele);
-    }, false);
-    return res;
-}
-template<NoDel T> T get(Aq<T>& q, auto filt) {
-    T res;
-    init(res);
-    apply(q, filt, [&](auto* ele) {
-          res = ele->data;
     }, false);
     return res;
 }
@@ -180,7 +172,7 @@ size_t rm(Aq<auto>& q, auto filt) {
     });
     return n;
 }
-template<Del T> auto last(Aq<T>& q) {
+template<typename T> auto last(Aq<T>& q) {
     T res;
     init(res);
     applyzip(q, [](T, Ele<T>* nx) {
@@ -188,16 +180,6 @@ template<Del T> auto last(Aq<T>& q) {
     }, [&](auto ele) {
           res = ele->data;
           free(ele);
-    }, false);
-    return res;
-}
-template<NoDel T> auto last(Aq<T>& q) {
-    T res;
-    init(res);
-    applyzip(q, [](T, Ele<T>* nx) {
-          return nx == nullptr;
-    }, [&](auto ele) {
-          res = ele->data;
     }, false);
     return res;
 }
