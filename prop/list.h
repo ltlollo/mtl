@@ -16,21 +16,26 @@ template<typename T> void prefetch(T* x) { __buildin_prefetch(x); }
 
 namespace mtl {
 
-template<typename T> struct alignas(cacheln) Ele {
+template<typename T>
+struct alignas(cacheln) Ele {
     std::atomic<Ele<T>*> next;
     T data;
     Ele() noexcept {
         next = nullptr;
     }
     Ele(T&& value) noexcept : data{std::move(value)} {
-        static_assert(std::is_nothrow_move_constructible<T>());
-        static_assert(std::is_default_constructible<T>());
+        static_assert(std::is_nothrow_move_constructible<T>(),
+                      "move cannot throw");
+        static_assert(std::is_default_constructible<T>(),
+                      "must be default constructable");
     }
     Ele(const T& value) noexcept : data{value} {
-        static_assert(std::is_nothrow_copy_constructible<T>());
+        static_assert(std::is_nothrow_copy_constructible<T>(),
+                      "copy cannot throw");
     }
 };
-template<typename T> struct alignas(cacheln) Ele<T*> {
+template<typename T>
+struct alignas(cacheln) Ele<T*> {
     std::atomic<Ele<T*>*> next;
     T *data;
     Ele() noexcept {
@@ -43,13 +48,22 @@ template<typename T> struct alignas(cacheln) Ele<T*> {
         delete data;
     }
 };
-
-template<typename T> struct MtList {
-    Ele<T> trampoline = {};
+template<typename T, unsigned N = 1>
+struct MtList {
+    Ele<T> entry[N];
+    MtList() {
+        static_assert(N > 0, "must have at least one entry");
+        for (unsigned i = 0; i < N-1; ++i) {
+            entry[i].next = &entry[i+1];
+        }
+        entry[N-1].next = nullptr;
+    }
 };
+
 // make sure that chain i valid (null terminated list
-template<typename T> void chain(MtList<T>& q, Ele<T>* ele) noexcept {
-    Ele<T> *curr = &q.trampoline;
+template<typename T>
+void chain(MtList<T, 1>& q, Ele<T>* ele) noexcept {
+    Ele<T> *curr = &q.entry[0];
     Ele<T> *prev = curr;
     Ele<T> *next;
     while ((curr = curr->next.exchange(curr, consume)) == prev) {
@@ -68,8 +82,8 @@ template<typename T> void chain(MtList<T>& q, Ele<T>* ele) noexcept {
     return;
 }
 template<typename T, typename P, typename F>
-void trim(MtList<T>& q, F filt, P pred, bool cont = true) noexcept {
-    Ele<T> *curr = &q.trampoline;
+void trim(MtList<T, 1>& q, F filt, P pred, bool cont = true) noexcept {
+    Ele<T> *curr = &q.entry[0];
     Ele<T> *prev = curr;
     Ele<T> *next;
     while ((curr = curr->next.exchange(curr, consume)) == prev) {
@@ -100,8 +114,8 @@ void trim(MtList<T>& q, F filt, P pred, bool cont = true) noexcept {
     prev->next.store(nullptr, relaxed);
 }
 template<typename T, typename P, typename F>
-void trimzip(MtList<T>& q, F filt, P pred, bool cont = true) noexcept {
-    Ele<T> *curr = &q.trampoline;
+void trimzip(MtList<T, 1>& q, F filt, P pred, bool cont = true) noexcept {
+    Ele<T> *curr = &q.entry[0];
     Ele<T> *prev = curr;
     Ele<T> *next;
     while ((curr = curr->next.exchange(curr, consume)) == prev) {
@@ -132,8 +146,8 @@ void trimzip(MtList<T>& q, F filt, P pred, bool cont = true) noexcept {
     prev->next.store(nullptr, relaxed);
 }
 template<typename T, typename P>
-bool insert(MtList<T>& q, Ele<T>* head, Ele<T>* tail, P pred) noexcept {
-    Ele<T> *curr = &q.trampoline;
+bool insert(MtList<T, 1>& q, Ele<T>* head, Ele<T>* tail, P pred) noexcept {
+    Ele<T> *curr = &q.entry[0];
     Ele<T> *prev = curr;
     Ele<T> *next;
     while ((curr = curr->next.exchange(curr, consume)) == prev) {
@@ -163,13 +177,13 @@ bool insert(MtList<T>& q, Ele<T>* head, Ele<T>* tail, P pred) noexcept {
 }
 
 template<typename T, typename P>
-bool insert(MtList<T>& q, Ele<T>* ele, P pred) noexcept {
+bool insert(MtList<T, 1>& q, Ele<T>* ele, P pred) noexcept {
     return insert(q, ele, ele, pred);
 }
 
 template<typename T>
-void push(MtList<T>& q, Ele<T>* head, Ele<T>* tail) noexcept {
-    Ele<T> *curr = &q.trampoline;
+void push(MtList<T, 1>& q, Ele<T>* head, Ele<T>* tail) noexcept {
+    Ele<T> *curr = &q.entry[0];
     Ele<T> *prev = curr;
     while ((curr = curr->next.exchange(curr, consume)) == prev) {
         continue;
@@ -178,11 +192,11 @@ void push(MtList<T>& q, Ele<T>* head, Ele<T>* tail) noexcept {
     prev->next.store(head, release);
 }
 template<typename T>
-void push(MtList<T>& q, Ele<T>* ele) noexcept {
+void push(MtList<T, 1>& q, Ele<T>* ele) noexcept {
     push(q, ele, ele);
 }
 template<typename T, typename F>
-auto get(MtList<T*>& q, F filt) noexcept {
+auto get(MtList<T*, 1>& q, F filt) noexcept {
     T *res = nullptr;
     trim(q, filt, [&](auto* ele) {
           std::swap(res, ele->data);
@@ -191,7 +205,7 @@ auto get(MtList<T*>& q, F filt) noexcept {
     return res;
 }
 template<typename T, typename F>
-auto get(MtList<T>& q, F filt) noexcept {
+auto get(MtList<T, 1>& q, F filt) noexcept {
     T res = {};
     trim(q, filt, [&](auto* ele) {
           res = std::move(ele->data);
@@ -200,7 +214,7 @@ auto get(MtList<T>& q, F filt) noexcept {
     return res;
 }
 template<typename T, typename F>
-size_t rm(MtList<T>& q, F filt) noexcept {
+size_t rm(MtList<T, 1>& q, F filt) noexcept {
     size_t n = 0;
     trim(q, filt, [&](auto* ele) {
           delete ele;
@@ -209,7 +223,7 @@ size_t rm(MtList<T>& q, F filt) noexcept {
     return n;
 }
 template<typename T>
-auto last(MtList<T>& q) noexcept {
+auto last(MtList<T, 1>& q) noexcept {
     T res = {};
     trimzip(q, [](T, Ele<T>* nx) {
           return nx == nullptr;
@@ -220,7 +234,7 @@ auto last(MtList<T>& q) noexcept {
     return res;
 }
 template<typename T>
-auto last(MtList<T*>& q) noexcept {
+auto last(MtList<T*, 1>& q) noexcept {
     T *res = nullptr;
     trimzip(q, [](T, Ele<T>* nx) {
           return nx == nullptr;
@@ -231,7 +245,7 @@ auto last(MtList<T*>& q) noexcept {
     return res;
 }
 template<typename T>
-bool rmlast(MtList<T>& q) noexcept {
+bool rmlast(MtList<T, 1>& q) noexcept {
     Ele<T> *res = nullptr;
     trimzip(q, [](auto, auto* nx) {
         return nx == nullptr;
@@ -245,7 +259,7 @@ bool rmlast(MtList<T>& q) noexcept {
     return false;
 }
 template<typename T, typename F>
-Ele<T>* gather(MtList<T>& q, F filt) noexcept {
+Ele<T>* gather(MtList<T, 1>& q, F filt) noexcept {
     Ele<T> *head = nullptr;
     trim(q, filt, [&](auto* ele) {
         ele->next = head;
@@ -255,10 +269,10 @@ Ele<T>* gather(MtList<T>& q, F filt) noexcept {
 }
 
 template<typename T>
-void atomic_swap(MtList<T>& f, MtList<T>& s) noexcept {
-    Ele<T> *fcurr = &f.trampoline;
+void atomic_swap(MtList<T, 1>& f, MtList<T, 1>& s) noexcept {
+    Ele<T> *fcurr = &f.entry[0];
     Ele<T> *fprev = fcurr;
-    Ele<T> *scurr = &s.trampoline;
+    Ele<T> *scurr = &s.entry[0];
     Ele<T> *sprev = scurr;
     while ((fcurr = fcurr->next.exchange(fcurr, consume)) == fprev) {
         continue;
@@ -271,3 +285,5 @@ void atomic_swap(MtList<T>& f, MtList<T>& s) noexcept {
 }
 
 }
+
+#include "mlist.h"
