@@ -1,10 +1,18 @@
 #include <cstdint>
 #include <chrono>
 #include <stdio.h>
+#include <atomic>
 
 namespace mtl {
 
-void bench(auto pred, const char *msg, size_t times = 1000) {
+struct alignas(64) Count {
+    std::atomic<size_t> data;
+};
+
+static Count counters[512];
+
+template<typename P>
+void bench(P pred, const char *msg, size_t times = 1000) {
     using namespace std::chrono;
     using ms = milliseconds;
     using clk = high_resolution_clock;
