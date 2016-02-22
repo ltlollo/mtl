@@ -71,7 +71,7 @@ template<typename T> void chain(MtList<T>& q, Ele<T>* ele) noexcept {
     } while (true);
 }
 template<typename T>
-void apply(MtList<T>& q, auto filt, auto pred, bool cont = true) noexcept {
+void trim(MtList<T>& q, auto filt, auto pred, bool cont = true) noexcept {
     Ele<T> *curr = &q.trampoline;
     Ele<T> *prev = curr;
     Ele<T> *next;
@@ -99,7 +99,7 @@ void apply(MtList<T>& q, auto filt, auto pred, bool cont = true) noexcept {
     prev->next.store(nullptr, relaxed);
 }
 template<typename T>
-void applyzip(MtList<T>& q, auto filt, auto pred, bool cont = true) noexcept {
+void trimzip(MtList<T>& q, auto filt, auto pred, bool cont = true) noexcept {
     Ele<T> *curr = &q.trampoline;
     Ele<T> *prev = curr;
     Ele<T> *next;
@@ -174,7 +174,7 @@ template<typename T> void push(MtList<T>& q, Ele<T>* ele) noexcept {
 }
 template<typename T> auto get(MtList<T*>& q, auto filt) noexcept {
     T *res = nullptr;
-    apply(q, filt, [&](auto* ele) {
+    trim(q, filt, [&](auto* ele) {
           std::swap(res, ele->data);
           delete ele;
     }, false);
@@ -182,7 +182,7 @@ template<typename T> auto get(MtList<T*>& q, auto filt) noexcept {
 }
 template<typename T> auto get(MtList<T>& q, auto filt) noexcept {
     T res = {};
-    apply(q, filt, [&](auto* ele) {
+    trim(q, filt, [&](auto* ele) {
           res = std::move(ele->data);
           delete ele;
     }, false);
@@ -190,7 +190,7 @@ template<typename T> auto get(MtList<T>& q, auto filt) noexcept {
 }
 size_t rm(MtList<auto>& q, auto filt) noexcept {
     size_t n = 0;
-    apply(q, filt, [&](auto* ele) {
+    trim(q, filt, [&](auto* ele) {
           delete ele;
           ++n;
     });
@@ -198,7 +198,7 @@ size_t rm(MtList<auto>& q, auto filt) noexcept {
 }
 template<typename T> auto last(MtList<T>& q) noexcept {
     T res = {};
-    applyzip(q, [](T, Ele<T>* nx) {
+    trimzip(q, [](T, Ele<T>* nx) {
           return nx == nullptr;
     }, [&](auto* ele) {
           res = std::move(ele->data);
@@ -208,7 +208,7 @@ template<typename T> auto last(MtList<T>& q) noexcept {
 }
 template<typename T> auto last(MtList<T*>& q) noexcept {
     T *res = nullptr;
-    applyzip(q, [](T, Ele<T>* nx) {
+    trimzip(q, [](T, Ele<T>* nx) {
           return nx == nullptr;
     }, [&](auto* ele) {
           std::swap(res, ele->data);
@@ -218,7 +218,7 @@ template<typename T> auto last(MtList<T*>& q) noexcept {
 }
 template<typename T> bool rmlast(MtList<T>& q) noexcept {
     Ele<T> *res = nullptr;
-    applyzip(q, [](auto, auto* nx) {
+    trimzip(q, [](auto, auto* nx) {
         return nx == nullptr;
     }, [&](auto* ele) {
         res = ele;
@@ -231,7 +231,7 @@ template<typename T> bool rmlast(MtList<T>& q) noexcept {
 }
 template<typename T> Ele<T>* gather(MtList<T>& q, auto filt) noexcept {
     Ele<T> *head = nullptr;
-    apply(q, filt, [&](auto* ele) {
+    trim(q, filt, [&](auto* ele) {
         ele->next = head;
         head = ele;
     });
