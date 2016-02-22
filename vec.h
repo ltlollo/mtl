@@ -72,7 +72,7 @@ template<typename T> void ezero(T* raw, const size_t size) {
 }
 
 template<typename T> struct Vec {
-    using  Ele      = T;
+    using  Owned      = T;
     size_t size     = 0;
     size_t reserved = 0;
     T*     data     = nullptr;
@@ -154,7 +154,7 @@ DnCont{T} bool pusham(T& dst, const auto& ele, size_t initn = 1) {
 }
 
 Cont{C} void del(C& vec)
-requires Del<typename C::Ele> {
+requires Del<typename C::Owned> {
     for (size_t i = 0; i < vec.size; ++i) {
         del(vec[i]);
     }
@@ -162,7 +162,7 @@ requires Del<typename C::Ele> {
     init(vec);
 }
 Cont{C} void del(C& vec)
-requires NoDel<typename C::Ele> {
+requires NoDel<typename C::Owned> {
     free(vec.data);
     init(vec);
 }
@@ -174,7 +174,7 @@ void init(Vec<auto>& vec) {
 }
 
 template<typename T, size_t N = 16> struct MuVec {
-    using  Ele      = T;
+    using  Owned      = T;
     size_t size     = 0;
     size_t reserved = N;
     T*     data     = mem;
@@ -239,7 +239,7 @@ void cutoff(MuVec<T, N>& vec, size_t size) {
     vec.size = size;
 }
 DnCont{C} void cutoff(C& vec, size_t size)
-requires Del<typename C::Ele> {
+requires Del<typename C::Owned> {
     if (vec.size < size) {
         return;
     }
@@ -249,7 +249,7 @@ requires Del<typename C::Ele> {
     vec.size = size;
 }
 DnCont{C} void cutoff(C& vec, size_t size)
-requires NoDel<typename C::Ele> {
+requires NoDel<typename C::Owned> {
     if (vec.size < size) {
         return;
     }
@@ -339,7 +339,7 @@ bool reserve(MuVec<T, N>& vec, const size_t ns) {
 }
 
 template<typename T> struct FixVec {
-    using  Ele      = T;
+    using  Owned      = T;
     size_t size     = 0;
     T*     data     = nullptr;
     T& operator[](size_t i) { return data[i]; }
@@ -371,7 +371,7 @@ void init(FixVec<auto>& vec) {
 
 template<DnCont T, DnCont U>
 bool copy(T& dst, U& src)
-requires Copy<typename U::Ele> {
+requires Copy<typename U::Owned> {
     cutoff(dst, 0);
     if (reserve(dst, src.size) == false) {
         return false;
@@ -389,7 +389,7 @@ requires Copy<typename U::Ele> {
 }
 template<DnCont T, DnCont U>
 bool copy(T& dst, U& src)
-requires NoCopy<typename U::Ele> {
+requires NoCopy<typename U::Owned> {
     cutoff(dst, 0);
     if (reserve(dst, src.size) == false) {
         return false;
@@ -415,7 +415,7 @@ DnCont{T} bool resize(T& vec, const size_t n, const NoReloc& ele) {
     return true;
 }
 DnCont{T} bool resize(T& vec, const size_t n)
-requires Init<typename T::Ele> {
+requires Init<typename T::Owned> {
     if (vec.size == n) {
     } else if (vec.size > n) {
         cutoff(vec, n);

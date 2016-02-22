@@ -47,7 +47,7 @@ template<typename T> struct alignas(cacheln) Ele<T*> {
 template<typename T> struct MtList {
     Ele<T> trampoline = {};
 };
-
+// make sure that chain i valid (null terminated list
 template<typename T> void chain(MtList<T>& q, Ele<T>* ele) noexcept {
     Ele<T> *curr = &q.trampoline;
     Ele<T> *prev = curr;
@@ -55,24 +55,17 @@ template<typename T> void chain(MtList<T>& q, Ele<T>* ele) noexcept {
     while ((curr = curr->next.exchange(curr, consume)) == prev) {
         continue;
     }
-    if (curr == nullptr) {
-        prev->next.store(ele, relaxed);
-        return;
-    }
-    do {
+    while (likely(curr)) {
         next = curr;
         while ((next = next->next.exchange(next, consume)) == curr) {
             continue;
         }
-        if (unlikely(next == nullptr)) {
-            curr->next.store(ele, relaxed);
-            return;
-        } else {
-            prev->next.store(curr, relaxed);
-            prev = curr;
-            curr = next;
-        }
-    } while (true);
+        prev->next.store(curr, relaxed);
+        prev = curr;
+        curr = next;
+    }
+    prev->next.store(ele, relaxed);
+    return;
 }
 template<typename T, typename P, typename F>
 void trim(MtList<T>& q, F filt, P pred, bool cont = true) noexcept {

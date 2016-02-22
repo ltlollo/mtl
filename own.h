@@ -6,6 +6,7 @@
 namespace mtl {
 
 template<typename T> struct Own {
+    using Owned = T;
     T* data;
 };
 void init(Own<auto>& d) {
