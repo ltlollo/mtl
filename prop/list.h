@@ -47,16 +47,27 @@ template<typename T> struct MtList {
 template<typename T> void chain(MtList<T>& q, Ele<T>* ele) noexcept {
     Ele<T> *curr = &q.trampoline;
     Ele<T> *prev = curr;
+    Ele<T> *next;
+    while ((curr = curr->next.exchange(curr, consume)) == prev) {
+        continue;
+    }
+    if (curr == nullptr) {
+        prev->next.store(ele, relaxed);
+        return;
+    }
     do {
-        while ((curr = curr->next.exchange(curr, consume)) == prev) {
+        next = curr;
+        while ((next = next->next.exchange(next, consume)) == curr) {
             continue;
         }
-        if (curr == nullptr) {
-            prev->next.store(ele, relaxed);
+        if (next == nullptr) {
+            curr->next.store(ele, relaxed);
             return;
+        } else {
+            prev->next.store(curr, relaxed);
+            prev = curr;
+            curr = next;
         }
-        prev->next.store(curr, relaxed);
-        prev = curr;
     } while (true);
 }
 template<typename T>
@@ -119,21 +130,27 @@ template<typename T>
 bool insert(MtList<T>& q, auto* head, auto* tail, auto pred) noexcept {
     Ele<T> *curr = &q.trampoline;
     Ele<T> *prev = curr;
-    do {
-        while ((curr = curr->next.exchange(curr, consume)) == prev) {
+    Ele<T> *next;
+    while ((curr = curr->next.exchange(curr, consume)) == prev) {
+        continue;
+    }
+    while (curr) {
+        next = curr;
+        while ((next = next->next.exchange(next, consume)) == curr) {
             continue;
         }
         if (pred(prev, curr)) {
-            tail->next.store(curr, relaxed);
-            prev->next.store(head, release);
+            tail->next.store(next, relaxed);
+            curr->next.store(head, release);
             return true;
+        } else {
+            prev->next.store(curr, relaxed);
+            prev = curr;
+            curr = next;
         }
-        prev->next.store(curr, relaxed);
-        if (curr == nullptr) {
-            return false;
-        }
-        prev = curr;
-    } while (true);
+    }
+    prev->next.store(nullptr, relaxed);
+    return false;
 }
 
 template<typename T>
