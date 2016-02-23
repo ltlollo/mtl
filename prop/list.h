@@ -5,16 +5,9 @@
 #include <utility>
 #include <cstddef>
 
-static constexpr auto cacheln = 64;
-static constexpr auto consume = std::memory_order_consume;
-static constexpr auto relaxed = std::memory_order_relaxed;
-static constexpr auto release = std::memory_order_release;
-#define unlikely(x) __builtin_expect(!!(x), 0)
-#define likely(x)   __builtin_expect(!!(x), 1)
-template<typename T> void prefetch(T) {}
-template<typename T> void prefetch(T* x) { __buildin_prefetch(x); }
-
 namespace mtl {
+
+// Teseted functions are above this comment.
 
 // Element of the `MtList`, contains `T data`, the user provided data, and
 // `*next`, an atomic pointer to either the next element or nullptr.
@@ -25,21 +18,21 @@ template <typename T> struct Ele;
 template <typename T> struct Ele<T *>;
 
 // Lock-free list, with `N` insertion points, `N` is 1 by default.
-// Notes: Owned data is not automatically deleted on destruction.
-//        Prefer `N = 1` specializeation.
+// Notes: owned data is not automatically deleted on destruction.
+//        prefer `N = 1` specializeation.
 template <typename T, unsigned N> struct MtList;
 
 // Tail insetion function, will insert the `e` provided list at the end of
 // the list.
 // Notes: `e` must be a nullptr terminated list.
-//        Prefer other insertion methods.
+//        prefer other insertion methods.
 template <typename T, unsigned N>
 void chain(MtList<T, N> &, Ele<T> *e) noexcept;
 
 // Utility function, removes elements if owned data matches `filt`,
 // consequently applies `pred` to them. Returns immediatly if `cont` is set to
 // false.
-// Notes: cont is `true` by default
+// Notes: `cont` is `true` by default
 template <typename T, typename P, typename F, unsigned N>
 void trim(MtList<T, N> &, F filt, P pred, bool cont) noexcept;
 // same as `trim`, but `filt` will be applied to the current element's data,
@@ -108,7 +101,18 @@ template <typename T, unsigned N> bool rmlast(MtList<T *, N> &) noexcept;
 template <typename T, typename F, unsigned N>
 Ele<T> *gather(MtList<T, N> &, F) noexcept;
 
+// Retrieval function, gets the head of the list, if any
+// Notes: if the list is empty returns nullptr.
 template <typename T, unsigned N> Ele<T> *tail(MtList<T, N> &) noexcept;
+
+static constexpr auto cacheln = 64;
+static constexpr auto consume = std::memory_order_consume;
+static constexpr auto relaxed = std::memory_order_relaxed;
+static constexpr auto release = std::memory_order_release;
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#define likely(x)   __builtin_expect(!!(x), 1)
+template<typename T> void prefetch(T) {}
+template<typename T> void prefetch(T* x) { __buildin_prefetch(x); }
 
 #include "slist.h"
 #include "mlist.h"
