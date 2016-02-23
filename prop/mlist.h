@@ -105,6 +105,39 @@ void trimzip(MtList<T, N>& q, Entry<M>, F filt, P pred, bool cont = true) noexce
     }
     prev->next.store(nullptr, relaxed);
 }
+
+template<typename T, unsigned N>
+Ele<T>* chunk(MtList<T, N>& q, unsigned m = 0) {
+    if (m > N-1) {
+        m = 0;
+    }
+    Ele<T> *curr = &q.entry[m];
+    Ele<T> *prev = curr;
+    Ele<T> *head;
+    unsigned i = m;
+    while ((curr = curr->next.exchange(curr, consume)) == prev) {
+        continue;
+    }
+    Ele<T>* nxentry = (i == N-1) ? nullptr : &q.entry[i+1];
+    q.entry[i].next.store(nxentry, relaxed);
+    head = curr;
+    prev = curr;
+    if (curr == nxentry) {
+        return nullptr;
+    }
+    do {
+        while ((curr = curr->next.exchange(curr, consume)) == prev) {
+            continue;
+        }
+        if (curr == nxentry) {
+            prev->next.store(nullptr, relaxed);
+            return head;
+        }
+        prev->next.store(curr, relaxed);
+        prev = curr;
+    } while(true);
+}
+
 template<typename T, typename P, unsigned N, unsigned M>
 bool insert(MtList<T, N>& q, Entry<M>, Ele<T>* head, Ele<T>* tail, P pred) noexcept {
     static_assert(M < N, "must be inside the entry array");

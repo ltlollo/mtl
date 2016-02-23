@@ -175,7 +175,6 @@ bool insert(MtList<T, 1>& q, Ele<T>* head, Ele<T>* tail, P pred) noexcept {
     prev->next.store(nullptr, relaxed);
     return false;
 }
-
 template<typename T, typename P>
 bool insert(MtList<T, 1>& q, Ele<T>* ele, P pred) noexcept {
     return insert(q, ele, ele, pred);
@@ -267,6 +266,33 @@ Ele<T>* gather(MtList<T, 1>& q, F filt) noexcept {
     });
     return head;
 }
+template<typename T>
+Ele<T>* tail(MtList<T, 1>& q) {
+    Ele<T> *curr = &q.entry[0];
+    Ele<T> *prev = curr;
+    Ele<T> *head;
+    while ((curr = curr->next.exchange(curr, consume)) == prev) {
+        continue;
+    }
+    q.entry[0].next.store(nullptr, relaxed);
+    head = curr;
+    prev = curr;
+    if (curr == nullptr) {
+        return nullptr;
+    }
+    do {
+        while ((curr = curr->next.exchange(curr, consume)) == prev) {
+            continue;
+        }
+        if (curr == nullptr) {
+            prev->next.store(nullptr, relaxed);
+            return head;
+        }
+        prev->next.store(curr, relaxed);
+        prev = curr;
+    } while(true);
+}
+
 
 template<typename T>
 void atomic_swap(MtList<T, 1>& f, MtList<T, 1>& s) noexcept {
