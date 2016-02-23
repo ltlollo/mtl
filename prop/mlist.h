@@ -201,7 +201,7 @@ void push(MtList<T, N> &q, Entry<M> e, Ele<T> *ele) noexcept {
     push(q, e, ele, ele);
 }
 template <typename T, typename F, unsigned N, unsigned M>
-auto get(MtList<T *, N> &q, Entry<M> e, F filt) noexcept {
+T *get(MtList<T *, N> &q, Entry<M> e, F filt) noexcept {
     T *res = nullptr;
     trim(q, e, filt,
          [&](auto *ele) {
