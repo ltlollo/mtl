@@ -16,6 +16,100 @@ template<typename T> void prefetch(T* x) { __buildin_prefetch(x); }
 
 namespace mtl {
 
+// Element of the `MtList`, contains `T data`, the user provided data, and
+// `*next`, an atomic pointer to either the next element or nullptr.
+// Restrictions: owned data must be noexcept movable, or copyable.
+template <typename T> struct Ele;
+// The `T *` specializetion considers the contained pointer owned, so that the
+// class of functions dedicated to removal will automatically delete it.
+template <typename T> struct Ele<T *>;
+
+// Lock-free list, with `N` insertion points, `N` is 1 by default.
+// Notes: Owned data is not automatically deleted on destruction.
+//        Prefer `N = 1` specializeation.
+template <typename T, unsigned N> struct MtList;
+
+// Tail insetion function, will insert the `e` provided list at the end of
+// the list.
+// Notes: `e` must be a nullptr terminated list.
+//        Prefer other insertion methods.
+template <typename T, unsigned N>
+void chain(MtList<T, N> &, Ele<T> *e) noexcept;
+
+// Utility function, removes elements if owned data matches `filt`,
+// consequently applies `pred` to them. Returns immediatly if `cont` is set to
+// false.
+// Notes: cont is `true` by default
+template <typename T, typename P, typename F, unsigned N>
+void trim(MtList<T, N> &, F filt, P pred, bool cont) noexcept;
+// same as `trim`, but `filt` will be applied to the current element's data,
+// and the pointer to the next element.
+// Notes: the next pointer applied to `filt` might be null.
+template <typename T, typename P, typename F, unsigned N>
+void trimzip(MtList<T, N> &, F, P, bool c) noexcept;
+
+// Insertion function, inserts, the list linked between `head` and `tail`,
+// after `pred` applied to an element matches.
+// Notes: the list between `head` and `tail` must be valid.
+template <typename T, typename P, unsigned N>
+bool insert(MtList<T, N> &, Ele<T> *head, Ele<T> *tail, P pred) noexcept;
+// Inserts just one element.
+template <typename T, typename P, unsigned N>
+bool insert(MtList<T, N> &, Ele<T> *, P) noexcept;
+
+// Insertion function, inserts, the list linked between `head` and `tail`,
+// before `pred` applied to an element pointer matches.
+// Notes: the list between `head` and `tail` must be valid.
+//        the element pointer might be null.
+template <typename T, typename P, unsigned N>
+bool push(MtList<T, N> &q, Ele<T> *head, Ele<T> *tail, P pred) noexcept;
+// Inserts just one element.
+template <typename T, typename P, unsigned N>
+bool push(MtList<T, N> &q, Ele<T> *ele, P pred) noexcept;
+// Inserts at the front.
+template <typename T, unsigned N>
+void push(MtList<T, N> &, Ele<T> *, Ele<T> *) noexcept;
+template <typename T, unsigned N> void push(MtList<T, N> &, Ele<T> *) noexcept;
+
+// Retrieval function, moves out of the list either the first data matching
+// `pred`, or returns the default constructed version.
+// Notes: std::move is called on the data.
+template <typename T, typename F, unsigned N>
+T get(MtList<T, N> &, F) noexcept;
+// Notes: if the `T *` if the data is not found nullptr, is returned
+template <typename T, typename F, unsigned N>
+T *get(MtList<T *, N> &, F pred) noexcept;
+
+// Removal function, removes the data matching `pred`.
+// Returnes the number of elements removed this way.
+template <typename T, typename F, unsigned N>
+size_t rm(MtList<T, N> &, F) noexcept;
+// Deletes the data.
+template <typename T, typename F, unsigned N>
+size_t rm(MtList<T *, N> &, F) noexcept;
+
+// Retrieval function, moves out of the list either the last element's data, if
+// any, or returns the default constructed version.
+// Notes: prefer other retrieval functions.
+template <typename T, unsigned N> T last(MtList<T, N> &) noexcept;
+// Notes: if the list is empty nullptr, is returned.
+template <typename T, unsigned N> T *last(MtList<T *, N> &) noexcept;
+
+// Removal function, removes the last element of the list, if any, in case
+// returning true.
+// Notes: prefer other removal functions.
+template <typename T, unsigned N> bool rmlast(MtList<T, N> &) noexcept;
+// Deletes the data.
+template <typename T, unsigned N> bool rmlast(MtList<T *, N> &) noexcept;
+
+// Retrieval function, constructs a reversed list of the elements' data
+// matching `pred` and returns the pointer to the first element.
+// Notes: if no data matches, returns nullptr.
+template <typename T, typename F, unsigned N>
+Ele<T> *gather(MtList<T, N> &, F) noexcept;
+
+template <typename T, unsigned N> Ele<T> *tail(MtList<T, N> &) noexcept;
+
 template <typename T> struct alignas(cacheln) Ele {
     std::atomic<Ele<T> *> next;
     T data;
@@ -172,6 +266,42 @@ template <typename T, typename P>
 bool insert(MtList<T, 1> &q, Ele<T> *ele, P pred) noexcept {
     return insert(q, ele, ele, pred);
 }
+template <typename T, typename P>
+bool push(MtList<T, 1> &q, Ele<T> *head, Ele<T> *tail, P pred) noexcept {
+    Ele<T> *curr = &q.entry[0];
+    Ele<T> *prev = curr;
+    Ele<T> *next;
+    while ((curr = curr->next.exchange(curr, consume)) == prev) {
+        continue;
+    }
+    do {
+        auto cond = pred(curr);
+        if (unlikely(cond)) {
+            tail->next.store(curr, relaxed);
+            prev->next.store(head, release);
+           return true;
+        } else {
+            if (next == nullptr) {
+                break;
+            } else {
+                prefetch(next->data);
+            }
+            next = curr;
+            while ((next = next->next.exchange(next, consume)) == curr) {
+                continue;
+            }
+            prev->next.store(curr, relaxed);
+            prev = curr;
+            curr = next;
+        }
+    } while(true);
+    prev->next.store(nullptr, relaxed);
+    return false;
+}
+template <typename T, typename P>
+bool push(MtList<T, 1> &q, Ele<T> *ele, P pred) noexcept {
+    return push(q, ele, ele, pred);
+}
 
 template <typename T>
 void push(MtList<T, 1> &q, Ele<T> *head, Ele<T> *tail) noexcept {
@@ -186,8 +316,7 @@ void push(MtList<T, 1> &q, Ele<T> *head, Ele<T> *tail) noexcept {
 template <typename T> void push(MtList<T, 1> &q, Ele<T> *ele) noexcept {
     push(q, ele, ele);
 }
-template <typename T, typename F>
-auto get(MtList<T *, 1> &q, F filt) noexcept {
+template <typename T, typename F> T *get(MtList<T *, 1> &q, F filt) noexcept {
     T *res = nullptr;
     trim(q, filt,
          [&](auto *ele) {
@@ -197,7 +326,7 @@ auto get(MtList<T *, 1> &q, F filt) noexcept {
          false);
     return res;
 }
-template <typename T, typename F> auto get(MtList<T, 1> &q, F filt) noexcept {
+template <typename T, typename F> T get(MtList<T, 1> &q, F filt) noexcept {
     T res = {};
     trim(q, filt,
          [&](auto *ele) {
@@ -215,7 +344,7 @@ template <typename T, typename F> size_t rm(MtList<T, 1> &q, F filt) noexcept {
     });
     return n;
 }
-template <typename T> auto last(MtList<T, 1> &q) noexcept {
+template <typename T> T last(MtList<T, 1> &q) noexcept {
     T res = {};
     trimzip(q, [](T, Ele<T> *nx) { return nx == nullptr; },
             [&](auto *ele) {
@@ -225,7 +354,7 @@ template <typename T> auto last(MtList<T, 1> &q) noexcept {
             false);
     return res;
 }
-template <typename T> auto last(MtList<T *, 1> &q) noexcept {
+template <typename T> T *last(MtList<T *, 1> &q) noexcept {
     T *res = nullptr;
     trimzip(q, [](T, Ele<T> *nx) { return nx == nullptr; },
             [&](auto *ele) {
@@ -254,7 +383,7 @@ Ele<T> *gather(MtList<T, 1> &q, F filt) noexcept {
     });
     return head;
 }
-template <typename T> Ele<T> *tail(MtList<T, 1> &q) {
+template <typename T> Ele<T> *tail(MtList<T, 1> &q) noexcept {
     Ele<T> *curr = &q.entry[0];
     Ele<T> *prev = curr;
     Ele<T> *head;
