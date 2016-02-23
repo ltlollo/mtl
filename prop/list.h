@@ -292,22 +292,28 @@ Ele<T>* tail(MtList<T, 1>& q) {
         prev = curr;
     } while(true);
 }
-
-
-template<typename T>
-void atomic_swap(MtList<T, 1>& f, MtList<T, 1>& s) noexcept {
-    Ele<T> *fcurr = &f.entry[0];
-    Ele<T> *fprev = fcurr;
-    Ele<T> *scurr = &s.entry[0];
-    Ele<T> *sprev = scurr;
-    while ((fcurr = fcurr->next.exchange(fcurr, consume)) == fprev) {
-        continue;
+template<typename T, unsigned N>
+void atomic_swap(MtList<T, N>& f, MtList<T, N>& s) noexcept {
+    Ele<T> *fcurr[N];
+    Ele<T> *scurr[N];
+    Ele<T> *fprev;
+    Ele<T> *sprev;
+    for (unsigned i = 0; i < N; ++i) {
+        fcurr[i] = &f.entry[i];
+        fprev = fcurr[i];
+        scurr[i] = &s.entry[i];
+        sprev = scurr[i];
+        while ((fcurr[i] = fcurr[i]->next.exchange(fcurr[i], consume)) == fprev) {
+            continue;
+        }
+        while ((scurr[i] = scurr[i]->next.exchange(scurr[i], consume)) == sprev) {
+            continue;
+        }
     }
-    while ((scurr = scurr->next.exchange(scurr, consume)) == sprev) {
-        continue;
+    for (unsigned i = 0; i < N; ++i) {
+        f.entry[i]->next.store(scurr[i], relaxed);
+        s.entry[i]->next.store(fcurr[i], relaxed);
     }
-    fcurr->next.store(scurr, relaxed);
-    scurr->next.store(fcurr, relaxed);
 }
 
 }
