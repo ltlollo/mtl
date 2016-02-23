@@ -52,7 +52,9 @@ template <typename T, unsigned N = 1> struct MtList {
     }
 };
 
-// make sure that chain i valid (null terminated list
+// methods to operate on MtList with single insetion point
+
+// make sure that chain is valid (null terminated list)
 template <typename T> void chain(MtList<T, 1> &q, Ele<T> *ele) noexcept {
     Ele<T> *curr = &q.entry[0];
     Ele<T> *prev = curr;

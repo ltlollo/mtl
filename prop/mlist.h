@@ -2,6 +2,8 @@
 
 namespace mtl {
 
+// methods to operate on multiple insertion points
+
 template <unsigned N> struct Entry;
 
 template <typename T, unsigned N, unsigned M>
@@ -274,7 +276,7 @@ Ele<T> *gather(MtList<T, N> &q, Entry<M> e, F filt) noexcept {
     return head;
 }
 
-// non static interface
+// methods without insertion range checking
 
 template <typename T, unsigned N>
 void chain(MtList<T, N> &q, unsigned m, Ele<T> *ele) noexcept {
