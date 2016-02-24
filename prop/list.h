@@ -4,6 +4,8 @@
 #include <atomic>
 #include <utility>
 #include <cstddef>
+#include <vector>
+#include <string>
 
 namespace mtl {
 
@@ -105,14 +107,6 @@ Ele<T> *gather(MtList<T, N> &, F) noexcept;
 // Notes: if the list is empty returns nullptr.
 template <typename T, unsigned N> Ele<T> *tail(MtList<T, N> &) noexcept;
 
-static constexpr auto cacheln = 64;
-static constexpr auto consume = std::memory_order_consume;
-static constexpr auto relaxed = std::memory_order_relaxed;
-static constexpr auto release = std::memory_order_release;
-#define unlikely(x) __builtin_expect(!!(x), 0)
-#define likely(x)   __builtin_expect(!!(x), 1)
-template<typename T> void prefetch(T) {}
-template<typename T> void prefetch(T* x) { __buildin_prefetch(x); }
-
+#include "utils.h"
 #include "slist.h"
 #include "mlist.h"
