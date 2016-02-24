@@ -1,5 +1,3 @@
-#pragma once
-
 namespace mtl {
 
 // methods to operate on multiple insertion points

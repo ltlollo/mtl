@@ -1,11 +1,10 @@
-#pragma once
+#ifndef LIST_H
+#define LIST_H
 
 #include <type_traits>
 #include <atomic>
 #include <utility>
 #include <cstddef>
-#include <vector>
-#include <string>
 
 namespace mtl {
 
@@ -106,7 +105,10 @@ Ele<T> *gather(MtList<T, N> &, F) noexcept;
 // Retrieval function, gets the entire list, if any.
 // Notes: if the list is empty returns nullptr.
 template <typename T, unsigned N> Ele<T> *tail(MtList<T, N> &) noexcept;
+}
 
 #include "utils.h"
 #include "slist.h"
 #include "mlist.h"
+
+#endif // LIST_H

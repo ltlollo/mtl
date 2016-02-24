@@ -1,3 +1,5 @@
+namespace mtl {
+
 template <typename T> struct alignas(cacheln) Ele {
     std::atomic<Ele<T> *> next;
     T data;
