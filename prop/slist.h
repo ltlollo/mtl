@@ -165,12 +165,11 @@ bool push(MtList<T, 1> &q, Ele<T> *head, Ele<T> *tail, P pred) noexcept {
             prev->next.store(head, release);
            return true;
         } else {
-            if (next == nullptr) {
+            if ((next = curr) == nullptr) {
                 break;
             } else {
                 prefetch(next->data);
             }
-            next = curr;
             while ((next = next->next.exchange(next, consume)) == curr) {
                 continue;
             }
