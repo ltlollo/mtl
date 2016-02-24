@@ -1,3 +1,6 @@
+#ifndef UTILS_H
+#define UTILS_H
+
 #include <vector>
 #include <string>
 
@@ -22,3 +25,5 @@ template <typename T> void prefetch(std::string &x) {
 }
 
 }
+
+#endif // UTILS_H
