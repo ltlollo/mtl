@@ -101,7 +101,7 @@ template <typename T, unsigned N> bool rmlast(MtList<T *, N> &) noexcept;
 template <typename T, typename F, unsigned N>
 Ele<T> *gather(MtList<T, N> &, F) noexcept;
 
-// Retrieval function, gets the head of the list, if any
+// Retrieval function, gets the entire list, if any.
 // Notes: if the list is empty returns nullptr.
 template <typename T, unsigned N> Ele<T> *tail(MtList<T, N> &) noexcept;
 
