@@ -18,7 +18,7 @@ template <typename T> struct Ele;
 template <typename T> struct Ele<T *>;
 
 // Lock-free list, with `N` insertion points, `N` is 1 by default.
-// Notes: owned data is not automatically deleted on destruction.
+// Notes: no destructor is implemented.
 //        prefer `N = 1` specialization.
 template <typename T, unsigned N> struct MtList;
 
