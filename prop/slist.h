@@ -291,29 +291,4 @@ template <typename T> Ele<T> *tail(MtList<T, 1> &q) noexcept {
         prev = curr;
     } while (true);
 }
-template <typename T, unsigned N>
-void atomic_swap(MtList<T, N> &f, MtList<T, N> &s) noexcept {
-    Ele<T> *fcurr[N];
-    Ele<T> *scurr[N];
-    Ele<T> *fprev;
-    Ele<T> *sprev;
-    for (unsigned i = 0; i < N; ++i) {
-        fcurr[i] = &f.entry[i];
-        fprev = fcurr[i];
-        scurr[i] = &s.entry[i];
-        sprev = scurr[i];
-        while ((fcurr[i] = fcurr[i]->next.exchange(fcurr[i], consume)) ==
-               fprev) {
-            continue;
-        }
-        while ((scurr[i] = scurr[i]->next.exchange(scurr[i], consume)) ==
-               sprev) {
-            continue;
-        }
-    }
-    for (unsigned i = 0; i < N; ++i) {
-        f.entry[i]->next.store(scurr[i], relaxed);
-        s.entry[i]->next.store(fcurr[i], relaxed);
-    }
-}
 }

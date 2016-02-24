@@ -160,7 +160,7 @@ bool insert(MtList<T, N> &q, Entry<M>, Ele<T> *head, Ele<T> *tail,
             cond = false;
             ++i;
         } else {
-            cond = filt(prev, curr);
+            cond = pred(prev, curr);
         }
         while ((next = next->next.exchange(next, consume)) == curr) {
             continue;
@@ -407,7 +407,7 @@ bool insert(MtList<T, N> &q, unsigned m, Ele<T> *head, Ele<T> *tail,
             cond = false;
             ++i;
         } else {
-            cond = filt(prev, curr);
+            cond = pred(prev, curr);
         }
         while ((next = next->next.exchange(next, consume)) == curr) {
             continue;
