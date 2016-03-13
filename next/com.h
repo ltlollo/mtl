@@ -32,11 +32,12 @@ template<typename T> concept bool NoCopy  = !Copy<T>;
 template<typename T> concept bool NoOwner = !Owner<T>;
 
 template<typename T> concept bool Cont    =
-requires(T c, size_t i, typename T::Ele e) {
+requires(T c, size_t i, typename T::Owned e) {
     { make(c, i, e) } -> bool;
     { init(c)       } -> void;
     { c.size        } -> size_t;
-    { c[i]          } -> typename T::Owned;
+    requires At<T>;
+    requires Owner<T>;
 };
 
 template<typename T> concept bool DnCont  = requires(T c, const size_t i) {
